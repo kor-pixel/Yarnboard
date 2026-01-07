@@ -20,6 +20,9 @@ YarnBoard is a lightweight desktop app for creating **link charts** - visually o
 
 ## 📦 Downloads & Installation
 
+Downloads are available on the  
+➡️ **[GitHub Releases page](https://github.com/kor-pixel/YarnBoard/releases)**
+
 ### Windows
 - Download and run **`YarnBoardSetup.exe`**
 - The installer automatically installs required components:
