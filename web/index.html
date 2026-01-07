@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>YarnBoard</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+
+  <body>
+    <div id="app" class="app">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <button id="btnToggleSidebar" class="sidebar-toggle" type="button" aria-label="Collapse sidebar">
+            <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+              <path d="M4 5h16v14H4z" fill="none" stroke="currentColor" stroke-width="2" />
+              <path d="M9 5v14" fill="none" stroke="currentColor" stroke-width="2" />
+              <path
+                d="M7.5 12l-2-2m2 2l-2 2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+
+          <div class="brand-inline">
+            <div class="brand__title">YarnBoard</div>
+            <div class="brand__subtitle">Photos + yarn connections</div>
+          </div>
+        </div>
+
+        <div class="sidebar-content">
+          <div class="section">
+            <div class="section__title">Board</div>
+
+            <button id="btnAddPhotos" class="btn primary" type="button">
+              <span class="btn__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" class="icon">
+                  <path d="M4 5h16v14H4z" fill="none" stroke="currentColor" stroke-width="2" />
+                  <path
+                    d="M8 13l2-2 3 3 2-2 3 3"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path d="M8 9h0" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" />
+                </svg>
+              </span>
+              Add photos
+            </button>
+
+            <!-- ✅ tighter label->select spacing (match Mode spacing) -->
+            <label class="label label--tight" for="yarnSelect">Yarn color</label>
+            <select id="yarnSelect" class="select select--tight"></select>
+
+            <div class="section__title section__title--tight">Mode</div>
+            <div class="segmented">
+              <button id="modeSelect" class="segmented__btn is-active" type="button">Select</button>
+              <button id="modeConnect" class="segmented__btn" type="button">Connect</button>
+              <button id="modeDelete" class="segmented__btn" type="button">Delete</button>
+            </div>
+
+            <label class="label" for="imageQuality" style="margin-top: 14px;">Image rendering</label>
+            <select id="imageQuality" class="select">
+              <option value="optimized">Optimized (faster)</option>
+              <option value="high">High resolution</option>
+            </select>
+            <div class="hint" style="margin-top: 2px;">
+              Optimized automatically uses smaller textures for tiny photos to keep the app fast.
+            </div>
+
+            <div id="keyPanelSidebar" class="key">
+              <div class="key__header">
+                <div class="key__title">Yarn key</div>
+                <button id="btnAddKeyItem" class="btn small" type="button">+ Add</button>
+              </div>
+
+              <div id="keyListSidebar" class="key__list"></div>
+            </div>
+          </div>
+
+          <div class="section footer">
+            <div class="section__title">Save & Load</div>
+
+            <label class="label" for="saveFormat">Save format</label>
+            <select id="saveFormat" class="select">
+              <option value="yb">.yb (proprietary)</option>
+              <option value="sqlite">SQLite (.db)</option>
+            </select>
+
+            <div class="row" style="margin-top: 12px;">
+              <button id="btnSave" class="btn" type="button" style="margin-top: 0;">Save</button>
+            </div>
+            <div class="row">
+              <button id="btnLoad" class="btn" type="button" style="margin-top: 0;">Open</button>
+            </div>
+
+            <div id="statusLine" class="status"></div>
+            <div id="bridgeHint" class="hint" hidden>
+              Running in fallback mode (no Python bridge detected). Add photos via file picker; save/open uses JSON download/upload.
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div id="board" class="board">
+          <canvas id="yarnCanvas"></canvas>
+
+          <div id="photosLayer" class="photos-layer"></div>
+          <div id="pinsLayer" class="pins-layer"></div>
+
+          <div id="canvasKey" class="canvas-key ui-overlay" hidden>
+            <div class="canvas-key__title">Yarn key</div>
+            <div id="canvasKeyList" class="canvas-key__list"></div>
+          </div>
+
+          <div id="emptyState" class="empty">
+            <div style="text-align:center; max-width: 520px; padding: 20px;">
+              <div style="font-weight:800; font-size: 18px; margin-bottom: 8px;">Add photos to begin</div>
+              <div style="color: rgba(255,255,255,0.65); line-height: 1.4;">
+                Use <b>Connect</b> mode to create yarn between pins. Use <b>Select</b> mode to move and resize.
+              </div>
+            </div>
+          </div>
+
+          <div class="zoom-ui ui-overlay">
+            <button id="zoomOut" class="zoom-btn" type="button" aria-label="Zoom out">−</button>
+            <input id="zoomSlider" class="zoom-slider" type="range" min="25" max="200" value="100" />
+            <button id="zoomIn" class="zoom-btn" type="button" aria-label="Zoom in">+</button>
+            <div id="zoomLabel" class="zoom-label">100%</div>
+          </div>
+
+          <div class="bottom-bar ui-overlay">
+            <button id="btnCenter" class="bb-btn" type="button" aria-label="Center view">
+              <span class="icon-wrap" aria-hidden="true">
+                <svg viewBox="0 0 24 24" class="icon">
+                  <path
+                    d="M12 2v4M12 18v4M2 12h4M18 12h4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2" />
+                </svg>
+              </span>
+              Center
+            </button>
+
+            <button id="btnLock" class="bb-btn" type="button" aria-label="Lock/unlock editing">
+              <span id="lockIconWrap" class="icon-wrap" aria-hidden="true">
+                <svg viewBox="0 0 24 24" class="icon">
+                  <path
+                    d="M9 11V8a5 5 0 0 1 9.5-2"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <path d="M6 11h12v10H6z" fill="none" stroke="currentColor" stroke-width="2" />
+                </svg>
+              </span>
+              <span id="lockLabel">Edit</span>
+            </button>
+
+            <button id="btnToggleCanvasKey" class="bb-btn" type="button" aria-label="Toggle yarn key overlay">
+              <span class="icon-wrap" aria-hidden="true">
+                <svg viewBox="0 0 24 24" class="icon">
+                  <path
+                    d="M7 7h10M7 12h10M7 17h10"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </span>
+              Key
+            </button>
+
+            <button id="btnClearCanvas" class="bb-btn" type="button" aria-label="Clear board">
+              <span class="icon-wrap" aria-hidden="true">
+                <svg viewBox="0 0 24 24" class="icon">
+                  <path
+                    d="M4 7h16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <path
+                    d="M9 7V5h6v2"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M7 7l1 14h8l1-14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+              Clear
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <input id="fileInputImages" type="file" accept="image/*" multiple hidden />
+    <input id="fileInputBoard" type="file" accept=".yb,.json,.db,.sqlite" hidden />
+
+    <script type="module" src="./dist/app.js"></script>
+  </body>
+</html>

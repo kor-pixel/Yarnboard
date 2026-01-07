@@ -1,0 +1,36 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+
+# Node / frontend
+node_modules/
+web/node_modules/
+web/dist/
+
+# Build outputs
+build/
+dist/
+*.spec
+
+# App user data (boards)
+*.yb
+*.db
+*.sqlite
+
+# test image location:
+images/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

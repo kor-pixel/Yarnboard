@@ -1,0 +1,121 @@
+name: Build Linux (DEB)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Node deps
+        run: npm ci
+
+      - name: Build web
+        run: npm run build
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Linux runtime/build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            fakeroot \
+            dpkg-dev \
+            patchelf \
+            libgtk-3-0 \
+            libglib2.0-0 \
+            libnss3 \
+            libx11-6 \
+            libxcb1 \
+            libxext6 \
+            libxrender1 \
+            libxi6 \
+            libxrandr2 \
+            libxfixes3 \
+            libxkbcommon0 \
+            libasound2t64 || sudo apt-get install -y libasound2
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build app (PyInstaller)
+        run: |
+          pyinstaller --noconsole --onedir --clean --name YarnBoard \
+            --distpath dist \
+            --workpath build \
+            --add-data "web:web" \
+            --hidden-import=clr \
+            --collect-all pythonnet \
+            --collect-all clr_loader \
+            --collect-all webview \
+            main.py
+
+      - name: Build DEB package
+        run: |
+          set -eux
+
+          VERSION="0.1.0"
+          ARCH="amd64"
+          PKGDIR="pkgroot"
+
+          rm -rf "$PKGDIR"
+          mkdir -p "$PKGDIR/DEBIAN"
+          mkdir -p "$PKGDIR/opt/yarnboard"
+          mkdir -p "$PKGDIR/usr/bin"
+          mkdir -p "$PKGDIR/usr/share/applications"
+
+          cp -r dist/YarnBoard/* "$PKGDIR/opt/yarnboard/"
+
+          cat > "$PKGDIR/usr/bin/YarnBoard" << 'EOF'
+          #!/bin/sh
+          exec /opt/yarnboard/YarnBoard "$@"
+          EOF
+          chmod +x "$PKGDIR/usr/bin/YarnBoard"
+
+          cat > "$PKGDIR/usr/share/applications/yarnboard.desktop" << 'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=YarnBoard
+          Exec=YarnBoard
+          Categories=Utility;
+          Terminal=false
+          EOF
+
+          cat > "$PKGDIR/DEBIAN/control" << EOF
+          Package: yarnboard
+          Version: ${VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: ${ARCH}
+          Maintainer: Your Name <you@example.com>
+          Depends: libgtk-3-0, libglib2.0-0, libnss3, libx11-6, libxcb1, libxext6, libxrender1, libxi6, libxrandr2, libxfixes3, libxkbcommon0, libasound2t64 | libasound2, libwebkit2gtk-4.0-37 | libwebkit2gtk-4.1-0
+          Description: YarnBoard
+           YarnBoard desktop app.
+          EOF
+
+          fakeroot dpkg-deb --build "$PKGDIR" "YarnBoard-${VERSION}-${ARCH}.deb"
+          ls -la "YarnBoard-${VERSION}-${ARCH}.deb"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YarnBoard-linux-deb
+          path: |
+            YarnBoard-*.deb
+            dist/YarnBoard

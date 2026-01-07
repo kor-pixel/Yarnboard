@@ -1,0 +1,129 @@
+name: Build Windows (Installer)
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --- Decide version string (from release tag; fallback for manual runs) ---
+      - name: Set version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "release") {
+            $v = "${{ github.event.release.tag_name }}"
+          } else {
+            # manual run fallback: dev-<shortsha>
+            $sha = "${{ github.sha }}".Substring(0, 7)
+            $v = "dev-$sha"
+          }
+
+          # Optional: strip leading "v" from tags like v1.2.3
+          $v = $v -replace '^v', ''
+
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "INSTALLER_EXE=YarnBoardSetup-$v.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      # --- Web build ---
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Node deps
+        run: npm ci
+
+      - name: Build web
+        run: npm run build
+
+      # --- Python build ---
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build Windows app (PyInstaller)
+        shell: pwsh
+        run: |
+          pyinstaller --noconsole --onedir --clean --name YarnBoard `
+            --distpath dist `
+            --workpath build `
+            --add-data "web;web" `
+            --hidden-import=clr `
+            --collect-all pythonnet `
+            --collect-all clr_loader `
+            --collect-all webview `
+            main.py
+
+      # --- Download prerequisites into installer/deps ---
+      - name: Download WebView2 Evergreen Standalone (x64)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path installer\deps | Out-Null
+          Invoke-WebRequest `
+            -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" `
+            -OutFile "installer\deps\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+
+      - name: Download .NET 8 Desktop Runtime (x64)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path installer\deps | Out-Null
+          Invoke-WebRequest `
+            -Uri "https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x64.exe" `
+            -OutFile "installer\deps\windowsdesktop-runtime-win-x64.exe"
+
+      # --- Build installer ---
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y
+
+      - name: Compile installer
+        shell: pwsh
+        run: iscc installer\YarnBoard.iss
+
+      # Rename output to include version
+      - name: Rename installer with version
+        shell: pwsh
+        run: |
+          $src = "installer\Output\YarnBoardSetup.exe"
+          $dst = "installer\Output\$env:INSTALLER_EXE"
+
+          if (!(Test-Path $src)) {
+            Write-Error "Expected installer not found at: $src"
+          }
+
+          Move-Item -Force $src $dst
+          "Renamed installer to: $dst"
+
+      # Optional: keep as workflow artifact too
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YarnBoard-windows-installer-${{ env.VERSION }}
+          path: installer\Output\${{ env.INSTALLER_EXE }}
+
+      # Upload to the GitHub Release that triggered this run
+      - name: Upload installer to GitHub Release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" "installer\Output\${{ env.INSTALLER_EXE }}" --clobber

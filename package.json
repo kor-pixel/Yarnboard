@@ -1,0 +1,11 @@
+{
+  "name": "yarnboard",
+  "private": true,
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "scripts": {
+    "build": "tsc -p web/tsconfig.json",
+    "watch": "tsc -p web/tsconfig.json -w"
+  }
+}
