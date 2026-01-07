@@ -2,6 +2,8 @@
 
 YarnBoard is a lightweight desktop app for creating **link charts** - visually organizing images and relationships on a board using pins and ropes.
 
+Add your images to the board and move them around by dragging the pin at the top. 
+
 
 <p align="center">
   <img src="./assets/screenshot.jpg" alt="App Screenshot">
